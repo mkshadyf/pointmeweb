@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverActions: true,
+    serverActions: {
+      allowedOrigins: ['localhost:3000']
+    }
   },
   images: {
     domains: ['pmssfzblmsaphdlmxmdg.supabase.co'],
@@ -9,6 +11,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  reactStrictMode: true
+ // swcMinify: true
 }
 
-module.exports = nextConfig 
+module.exports = nextConfig

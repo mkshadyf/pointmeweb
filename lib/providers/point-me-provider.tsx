@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from 'next/navigation'
 import type { Database } from '@/types/database'
 import type { User } from '@supabase/auth-helpers-nextjs'
 
@@ -52,112 +53,59 @@ export function PointMeProvider({ children }: { children: React.ReactNode }) {
   const [reviews, setReviews] = useState<Database['public']['Tables']['reviews']['Row'][]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<PointMeError | null>(null)
-
+  
+  const router = useRouter()
   const supabase = createClientComponentClient<Database>()
-
-  const handleError = (error: any): PointMeError => {
-    console.error('Error:', error)
-    return {
-      code: error.code || 'UNKNOWN_ERROR',
-      message: error.message || 'An unknown error occurred',
-      details: error.details
-    }
-  }
 
   const fetchData = async () => {
     try {
-      setLoading(true)
-      setError(null)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      if (userError) throw userError
-
-      setUser(user as PointMeUser)
-
-      if (user) {
-        const userRole = user.user_metadata.role
-
-        // Fetch businesses based on role
-        const businessesQuery = supabase.from('businesses').select('*')
-        if (userRole === 'business') {
-          businessesQuery.eq('owner_id', user.id)
-        }
-        const { data: businessesData, error: businessesError } = await businessesQuery
-        if (businessesError) throw businessesError
-        setBusinesses(businessesData)
-
-        // Fetch services
-        const { data: servicesData, error: servicesError } = await supabase
-          .from('services')
-          .select('*')
-          .in('business_id', businessesData.map(b => b.id))
-        if (servicesError) throw servicesError
-        setServices(servicesData)
-
-        // Fetch bookings based on role
-        const bookingsQuery = supabase.from('bookings').select('*')
-        if (userRole === 'customer') {
-          bookingsQuery.eq('customer_id', user.id)
-        } else if (userRole === 'business') {
-          bookingsQuery.in('business_id', businessesData.map(b => b.id))
-        }
-        const { data: bookingsData, error: bookingsError } = await bookingsQuery
-        if (bookingsError) throw bookingsError
-        setBookings(bookingsData)
-
-        // Fetch reviews
-        const { data: reviewsData, error: reviewsError } = await supabase
-          .from('reviews')
-          .select('*')
-          .in('business_id', businessesData.map(b => b.id))
-        if (reviewsError) throw reviewsError
-        setReviews(reviewsData)
+      if (sessionError) throw sessionError
+      
+      if (!session) {
+        setUser(null)
+        setLoading(false)
+        return
       }
 
-    } catch (err) {
-      setError(handleError(err))
+      setUser(session.user as PointMeUser)
+      
+      // Only fetch data if user is authenticated
+      const [businessesData, servicesData, bookingsData, reviewsData] = await Promise.all([
+        supabase.from('businesses').select('*'),
+        supabase.from('services').select('*'),
+        supabase.from('bookings').select('*'),
+        supabase.from('reviews').select('*')
+      ])
+
+      setBusinesses(businessesData.data || [])
+      setServices(servicesData.data || [])
+      setBookings(bookingsData.data || [])
+      setReviews(reviewsData.data || [])
+      setError(null)
+    } catch (error: any) {
+      setError({
+        code: error.code || 'UNKNOWN_ERROR',
+        message: error.message || 'An unknown error occurred',
+        details: error.details
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  // Set up real-time subscriptions
   useEffect(() => {
-    if (!user) return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchData()
+    })
 
-    // Subscribe to bookings
-    const bookingsSubscription = supabase
-      .channel('bookings')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'bookings',
-        filter: user.user_metadata.role === 'customer' 
-          ? `customer_id=eq.${user.id}`
-          : `business_id=in.(${businesses.map(b => b.id).join(',')})`
-      }, () => {
-        fetchData() // Refresh data when bookings change
-      })
-      .subscribe()
-
-    // Subscribe to reviews
-    const reviewsSubscription = supabase
-      .channel('reviews')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'reviews',
-        filter: `business_id=in.(${businesses.map(b => b.id).join(',')})`
-      }, () => {
-        fetchData() // Refresh data when reviews change
-      })
-      .subscribe()
+    fetchData()
 
     return () => {
-      bookingsSubscription.unsubscribe()
-      reviewsSubscription.unsubscribe()
+      subscription.unsubscribe()
     }
-  }, [user, businesses])
+  }, [])
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -241,10 +189,6 @@ export function PointMeProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
     await fetchData()
   }
-
-  useEffect(() => {
-    fetchData()
-  }, [supabase])
 
   return (
     <PointMeContext.Provider value={{
