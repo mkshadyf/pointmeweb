@@ -1,6 +1,6 @@
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
-import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
@@ -28,14 +28,14 @@ export async function middleware(req: NextRequest) {
     const userRole = session.user.user_metadata.role
 
     if (
-      req.nextUrl.pathname.startsWith('/admin') && 
+      req.nextUrl.pathname.startsWith('/admin') &&
       userRole !== 'admin'
     ) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
     if (
-      req.nextUrl.pathname.startsWith('/business') && 
+      req.nextUrl.pathname.startsWith('/business') &&
       userRole !== 'business'
     ) {
       return NextResponse.redirect(new URL('/dashboard', req.url))

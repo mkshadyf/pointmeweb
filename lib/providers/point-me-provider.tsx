@@ -4,7 +4,9 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useRouter } from 'next/navigation'
 import type { Database } from '@/types/database'
-import type { User } from '@supabase/auth-helpers-nextjs'
+import type { SupabaseClient, User } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@supabase/supabase-js'
+import { GenericSchema } from '@supabase/supabase-js/dist/module/lib/types'
 
 // Define user metadata type
 interface UserMetadata {
@@ -44,6 +46,30 @@ type PointMeContextType = {
 }
 
 const PointMeContext = createContext<PointMeContextType | undefined>(undefined)
+
+type SupabaseContextType = {
+  supabase: ReturnType<typeof createClient>
+}
+
+const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined)
+
+export const SupabaseProvider = ({ children }: { children: React.ReactNode }) => {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  )
+  return (
+    <SupabaseContext.Provider value={{ supabase: supabase as SupabaseClient<unknown, never, GenericSchema> }}>
+      {children}
+    </SupabaseContext.Provider>
+  )
+}
+
+export const useSupabase = () => useContext(SupabaseContext)
 
 export function PointMeProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PointMeUser | null>(null)

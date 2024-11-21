@@ -76,3 +76,41 @@
     @apply bg-background text-foreground;
   }
 }
+ 
+/* Define CSS variables for theming */
+:root {
+  --background-color: #ffffff;
+  --text-color: #000000;
+}
+
+.light {
+  --background-color: #ffffff;
+  --text-color: #000000;
+}
+
+.dark {
+  --background-color: #000000;
+  --text-color: #ffffff;
+}
+
+/* Apply theme variables globally */
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  /* ... additional styles ... */
+}
+
+nav li {
+  margin-right: 1rem;
+  /* ... additional styles ... */
+}
+
+nav li.active a {
+  font-weight: bold;
+  text-decoration: underline;
+}
